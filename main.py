@@ -19,7 +19,27 @@ window.configure(padx=40, pady=40)
 status_label = None
 response_text = None
 
+#Setting the backend
 
+#settinf the theme
+def toggle_theme():
+    """Toggle theme between dark and light"""
+    if ctk.get_appearance_mode() == "Dark":
+        ctk.set_appearance_mode("light")
+        theme_button.configure(text="🌙 Dark Mode")
+        # Change frames to light colors
+        header_frame.configure(fg_color="#f0f0f0")
+        response_frame.configure(fg_color="#f0f0f0")
+        response_text.configure(fg_color="#ffffff")
+    else:
+        ctk.set_appearance_mode("dark")
+        theme_button.configure(text="☀️ Light Mode")
+        # Change frames back to dark colors
+        header_frame.configure(fg_color="#1a1a1a")
+        response_frame.configure(fg_color="#1a1a1a")
+        response_text.configure(fg_color="#0a0a0a")
+
+#Setting the API and responding the users mesage
 def update_status(message):
     """Update status label with current AI activity"""
     global status_label
@@ -202,6 +222,17 @@ def send_message(event=None):
 
 # ========== UI COMPONENTS ==========
 
+theme_button = ctk.CTkButton(
+    window,
+    text="☀️ Light Mode",
+    width=150,
+    height=40,
+    font=("Arial", 12),
+    corner_radius=10,
+    command=toggle_theme
+)
+theme_button.pack(pady=10)
+
 # Header Frame
 header_frame = ctk.CTkFrame(window, fg_color="#1a1a1a", corner_radius=15)
 header_frame.pack(pady=20, fill="x")
@@ -211,6 +242,9 @@ avatar_label = ctk.CTkLabel(header_frame, text="🤖", font=("Arial", 50))
 avatar_label.pack(pady=(30, 10))
 
 # Title
+
+theme_button.pack(pady=10)
+
 chatbot_label = ctk.CTkLabel(
     header_frame,
     text="Jarvis Bot",
