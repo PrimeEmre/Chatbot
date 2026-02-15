@@ -242,7 +242,6 @@ avatar_label = ctk.CTkLabel(header_frame, text="🤖", font=("Arial", 50))
 avatar_label.pack(pady=(30, 10))
 
 # Title
-
 theme_button.pack(pady=10)
 
 chatbot_label = ctk.CTkLabel(
