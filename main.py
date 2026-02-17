@@ -86,11 +86,12 @@ def ai_text_chat(user_message):
 
         # Text models to try
         models_to_try = [
-            "llava:13b",  # Best quality
-            "llava:7b",  # Good balance
-            "llava:latest",  # Fallback
-            "bakllava:latest",  # Alternative
-            "llava-llama3",  # Alternative
+            "deepseek-r1:8b",  # You have this
+            "llava:13b-v1.6",  # You have this (llava:13b-v1.6)
+            "llama3:2.3b",  # You have this
+            "llava:7b",  # You have this
+
+
         ]
 
         last_error = None
