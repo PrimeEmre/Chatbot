@@ -75,53 +75,85 @@ def show_error(error_message):
         response_text.configure(state="disabled")
 
 
+conversation_history = []
+
+
 def ai_text_chat(user_message):
-    """AI chatbot that can answer any text-based question"""
+    """SMARTER AI chatbot with context memory and better prompting"""
     conn = None
     try:
-        update_status("🤖 Jarvis is thinking...")
+        window.after(0, lambda: update_status("🤖 Jarvis is thinking..."))
 
-        # Connection to AI server
-        conn = http.client.HTTPSConnection("ai.recepguzel.com", timeout=60)
+        # Add user message to history
+        conversation_history.append({
+            "role": "user",
+            "content": user_message
+        })
 
-        # Text models to try
-        models_to_try = [
-            "deepseek-r1:8b",  # You have this
-            "llava:13b-v1.6",  # You have this (llava:13b-v1.6)
-            "llama3:2.3b",  # You have this
-            "llava:7b",  # You have this
+        # Keep only last 10 messages to avoid token limits
+        if len(conversation_history) > 10:
+            conversation_history.pop(0)
 
+        # Smart model selection based on query type
+        models_to_try = []
 
-        ]
+        # Check query type and prioritize models
+        query_lower = user_message.lower()
+
+        if any(word in query_lower for word in ["code", "program", "python", "javascript", "debug"]):
+            # Coding queries - use deepseek (best for code)
+            models_to_try = ["deepseek-r1:8b", "llama3.2:3b", "llava:7b"]
+        elif any(word in query_lower for word in ["explain", "how", "why", "what is"]):
+            # Educational queries - use llama (best for explanations)
+            models_to_try = ["llama3.2:3b", "deepseek-r1:8b", "llava:7b"]
+        else:
+            # General conversation - try all models
+            models_to_try = ["deepseek-r1:8b", "llama3.2:3b", "llava:7b", "llava:13b-v1.6"]
 
         last_error = None
 
         for model_name in models_to_try:
             try:
-                print(f"🔄 Trying text model: {model_name}")
+                print(f"🔄 Trying model: {model_name}")
+                window.after(0, lambda m=model_name: update_status(f"🤖 Using {m}..."))
+
+                # Enhanced system prompt for better responses
+                system_prompt = """You are Jarvis, an advanced AI assistant with these capabilities:
+
+🎯 CORE ABILITIES:
+- Answer questions with depth and accuracy
+- Provide step-by-step explanations when needed
+- Remember context from our conversation
+- Be helpful, friendly, and conversational
+- Give practical examples when explaining concepts
+
+💡 RESPONSE STYLE:
+- Be clear and concise, but thorough when needed
+- Use analogies to explain complex topics
+- Break down complex answers into digestible parts
+- Ask clarifying questions if the query is ambiguous
+
+🚫 AVOID:
+- Generic or vague responses
+- Overly formal language
+- Unnecessary jargon
+
+Be natural, intelligent, and genuinely helpful."""
 
                 payload_data = {
                     "model": model_name,
                     "messages": [
-                        {
-                            "role": "system",
-                            "content": """You are Jarvis, a helpful and friendly AI assistant. You can:
-- Answer questions on any topic
-- Have casual conversations
-- Provide explanations and help
-- Be creative and engaging
-
-Respond naturally and conversationally. Be helpful, accurate, and friendly."""
-                        },
-                        {
-                            "role": "user",
-                            "content": user_message
-                        }
-                    ],
+                                    {
+                                        "role": "system",
+                                        "content": system_prompt
+                                    }
+                                ] + conversation_history,  # Include conversation history for context
                     "stream": False,
                     "options": {
-                        "temperature": 0.7,
-                        "num_predict": 1000,
+                        "temperature": 0.8,  # Slightly higher for more creative responses
+                        "top_p": 0.9,  # Nucleus sampling for better quality
+                        "num_predict": 1500,  # More tokens for detailed responses
+                        "repeat_penalty": 1.1,  # Reduce repetition
                     }
                 }
 
@@ -132,7 +164,7 @@ Respond naturally and conversationally. Be helpful, accurate, and friendly."""
 
                 if conn:
                     conn.close()
-                conn = http.client.HTTPSConnection("ai.recepguzel.com", timeout=60)
+                conn = http.client.HTTPSConnection("ai.recepguzel.com", timeout=90)
                 conn.request("POST", "/api/chat", json.dumps(payload_data), headers)
 
                 res = conn.getresponse()
@@ -150,50 +182,78 @@ Respond naturally and conversationally. Be helpful, accurate, and friendly."""
                         full_response = result.get("response", "")
 
                     if full_response:
+                        # Add AI response to history
+                        conversation_history.append({
+                            "role": "assistant",
+                            "content": full_response
+                        })
+
                         window.after(0, lambda: update_status("✅ Response ready!"))
 
-                        # Format response
-                        formatted_response = f"""🤖 Jarvis says:
+                        # Enhanced formatting with emoji based on query type
+                        emoji = "🤖"
+                        if any(word in query_lower for word in ["code", "program"]):
+                            emoji = "💻"
+                        elif any(word in query_lower for word in ["explain", "teach"]):
+                            emoji = "📚"
+                        elif any(word in query_lower for word in ["help", "how to"]):
+                            emoji = "🔧"
+
+                        formatted_response = f"""{emoji} Jarvis:
 
 {full_response}
 
-─────────────────────────────
-⏰ {time.strftime('%H:%M:%S')}
+{'─' * 50}
+Model: {model_name} | Time: {time.strftime('%H:%M:%S')}
+Messages in context: {len(conversation_history)}
 """
                         window.after(0, lambda r=formatted_response: update_ui_with_token(r))
-                        return
+                        return  # Success!
                     else:
-                        raise Exception(f"No response from model")
+                        raise Exception("No response from model")
                 else:
                     error_body = res.read().decode("utf-8")
                     last_error = f"Model {model_name}: Status {res.status}"
                     print(f"❌ {last_error}")
                     continue
 
+            except socket.timeout:
+                last_error = f"Model {model_name}: Connection timeout"
+                print(f"❌ {last_error}")
+                continue
+
             except Exception as e:
                 last_error = f"Model {model_name}: {str(e)}"
                 print(f"❌ {last_error}")
                 continue
 
-        # No models worked
-        raise Exception(f"""Could not connect to AI models!
+        # If we get here, no models worked
+        error_msg = f"""Could not connect to any AI models!
 
-Please check:
-1. Server is running
-2. Models are installed (ollama pull llama3.2)
-3. Network connection
+Tried models: {', '.join(models_to_try)}
 
-Last error: {last_error}""")
+Solutions:
+1. Check if Ollama server is running
+2. Install models:
+   ollama pull deepseek-r1:8b
+   ollama pull llama3.2:3b
+3. Check network connection to ai.recepguzel.com
+4. Verify server authentication
 
-    except socket.timeout:
-        window.after(0, lambda: show_error("Request timeout - AI took too long to respond"))
+Last error: {last_error}"""
+
+        window.after(0, lambda m=error_msg: show_error(m))
+
     except Exception as e:
-        error_msg = str(e)
-        print(f"❌ Error: {error_msg}")
-        window.after(0, lambda m=error_msg: show_error(f"{m}"))
+        error_msg = f"Unexpected error: {str(e)}"
+        print(f"❌ Critical Error: {error_msg}")
+        window.after(0, lambda m=error_msg: show_error(m))
     finally:
         if conn:
-            conn.close()
+            try:
+                conn.close()
+            except:
+                pass
 
 
 def send_message(event=None):
